@@ -39,13 +39,30 @@ fieldset {
 
 .submit-button {
     display: flex;
+    justify-content: space-between;
+    margin: 15px 5px;
+}
+
+.solo-submit-button {
+    display: flex;
     justify-content: end;
     margin: 15px 5px;
 }
 
-.submit-button button {
+.submit-button button, .solo-submit-button button {
     padding: 10px 30px;
     font-size: 14px;
     cursor: pointer;
+}
+
+.result-container {
+    margin-top: 20px;
+    padding: 15px;
+    width: fit-content;
+    background-color: darkgray;
+    border: 1px solid black;
+    border-radius: 5px;
+    margin-left: auto;
+    margin-right: auto;
 }
 /* Layout styles */

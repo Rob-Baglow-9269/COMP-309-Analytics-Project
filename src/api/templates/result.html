@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="../static/styles.css">
+</head>
+<body>
+    <div id="main-body">
+        <div class="result-container">
+            <h2>Theft Risk Prediction Result:</h2>
+            <h1>{{ prediction_label }}</h1>
+            <p>Probability of bike being returned: {{ returned_probability }}</p>
+            <p>Probability of bike being stolen: {{ stolen_probability }}</p>
+            {% if prediction_label == 'NOT LIKELY RETURNED' %}
+                <div class="warning">
+                    <h4>It's unlikely that your bike will be returned.</h4>
+                    <div class="submit-button">
+                        <button onclick="window.location.href='/'">Go Back</button>
+                        <button onclick="window.location.href='https://www.sportchek.ca/'">Consider a new one</button>
+                    </div>
+                </div>
+            {% else %}
+                <div class="safe">
+                    <h4>Your bike has a good chance of being returned.</h4>
+                    <div class="submit-button">
+                        <button onclick="window.location.href='/'">Go Back</button>
+                        <button onclick="window.location.href='https://www.tps.ca/contact/'">Contact Toronto Police</button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -102,6 +102,23 @@ def index():
                            bike_types=opts.bike_types,
                            hoods=opts.hoods)
 
+@app.post("/result")
+def result():
+    try:
+        data = request.form.to_dict()
+        processed = preprocess_input(data)
+
+        prediction = model.predict(processed)[0]
+        probability = model.predict_proba(processed)[0][1]  # probability returned = 1
+
+        from flask import render_template
+        return render_template("result.html", returned_probability=float(probability),
+                               stolen_probability=float(1 - probability),
+                               prediction_label="LIKELY RETURNED" if prediction == 1 else "NOT LIKELY RETURNED")
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
 # ===============================
 # Run server
 # ===============================

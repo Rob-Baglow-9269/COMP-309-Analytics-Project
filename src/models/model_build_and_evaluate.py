@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -12,33 +14,128 @@ from sklearn.metrics import (
     confusion_matrix,
     classification_report,
     roc_curve,
-    roc_auc_score
+    roc_auc_score,
 )
+
 import pickle
 
 
 # ============================================================
-# 1. Load dataset
+# PATH SETUP
+# This script is inside: src/models/
+# Data directory is:     src/data/
 # ============================================================
 
-def load_dataset(path: str):
+BASE_DIR = Path(__file__).resolve().parent.parent   # goes from /src/models → /src
+DATA_DIR = BASE_DIR / "data"
+
+RAW_PATH = DATA_DIR / "Bicycle_Thefts_Open_Data.csv"
+CLEANED_PATH = DATA_DIR / "clean_bike_data.csv"
+MODEL_PATH =  BASE_DIR / "models/final_model.pkl"
+ROC_PATH = BASE_DIR / "models/roc_curve.png"
+
+
+# ============================================================
+# 1. LOAD RAW DATA
+# ============================================================
+
+def load_raw_data(path: Path):
     df = pd.read_csv(path)
-    print("Dataset loaded:", df.shape)
+    print("Raw dataset loaded:", df.shape)
     return df
 
 
 # ============================================================
-# 2. Train-test split
+# 2. CLEANING FUNCTION
+# ============================================================
+
+def clean_bike_data(df: pd.DataFrame):
+
+    keep_cols = [
+        "OCC_YEAR",
+        "OCC_MONTH",
+        "OCC_DAY",
+        "OCC_HOUR",
+        "BIKE_TYPE",
+        "BIKE_SPEED",
+        "BIKE_MAKE",
+        "BIKE_MODEL",
+        "BIKE_COST",
+        "STATUS"
+    ]
+
+    df = df[keep_cols].copy()
+
+    df["returned"] = df["STATUS"].apply(
+        lambda x: 1 if str(x).strip().upper() == "RECOVERED" else 0
+    )
+    df.drop(columns=["STATUS"], inplace=True)
+
+    numeric_cols = [
+        "OCC_YEAR",
+        "OCC_MONTH",
+        "OCC_DAY",
+        "OCC_HOUR",
+        "BIKE_SPEED",
+        "BIKE_COST"
+    ]
+
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+        df[col] = df[col].fillna(df[col].median())
+
+    # Fix categorical columns
+    df["BIKE_TYPE"] = df["BIKE_TYPE"].astype(str).replace(["nan", ""], "Unknown")
+    df["BIKE_MAKE"] = df["BIKE_MAKE"].astype(str).replace(["nan", ""], "Unknown")
+    df["BIKE_MODEL"] = df["BIKE_MODEL"].astype(str).replace(["nan", ""], "Unknown")
+
+    # Reduce cardinality
+    top_makes = df["BIKE_MAKE"].value_counts().nlargest(15).index
+    df["BIKE_MAKE"] = df["BIKE_MAKE"].where(df["BIKE_MAKE"].isin(top_makes), "Other")
+
+    top_models = df["BIKE_MODEL"].value_counts().nlargest(15).index
+    df["BIKE_MODEL"] = df["BIKE_MODEL"].where(df["BIKE_MODEL"].isin(top_models), "Other")
+
+    # One-hot encode
+    df = pd.get_dummies(
+        df,
+        columns=["BIKE_TYPE", "BIKE_MAKE", "BIKE_MODEL"],
+        drop_first=True
+    )
+
+    # FINAL FIX: remove any remaining NaNs
+    df = df.fillna(0)
+
+    df = df.sample(frac=1, random_state=42)
+
+    print("Cleaned dataset shape:", df.shape)
+    print("\nAny NaNs left:", df.isna().sum().sum())
+    return df
+
+
+# ============================================================
+# 3. SAVE CLEANED DATASET
+# ============================================================
+
+def save_cleaned_dataset(df: pd.DataFrame):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_csv(CLEANED_PATH, index=False)
+    print("Cleaned dataset saved →", CLEANED_PATH)
+
+
+# ============================================================
+# 4. TRAIN / TEST Split
 # ============================================================
 
 def split_data(df, target_column="returned"):
+
     if target_column not in df.columns:
-        raise ValueError(f"Target column '{target_column}' not found in dataset.")
+        raise ValueError(f"Target column '{target_column}' missing in dataset.")
 
     X = df.drop(target_column, axis=1)
     y = df[target_column]
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    return train_test_split(
         X,
         y,
         test_size=0.2,
@@ -46,29 +143,25 @@ def split_data(df, target_column="returned"):
         stratify=y
     )
 
-    return X_train, X_test, y_train, y_test
-
 
 # ============================================================
-# 3. Train Models
+# 5. TRAIN MODELS
 # ============================================================
 
 def train_logistic_regression(X_train, y_train):
-    model = LogisticRegression(max_iter=1000, solver="lbfgs")
+    model = LogisticRegression(max_iter=1000)
     model.fit(X_train, y_train)
     return model
 
 
 def train_decision_tree(X_train, y_train):
-    model = DecisionTreeClassifier(
-        random_state=42
-    )
+    model = DecisionTreeClassifier(random_state=42)
     model.fit(X_train, y_train)
     return model
 
 
 # ============================================================
-# 4. Evaluation helper
+# 6. EVALUATION HELPER
 # ============================================================
 
 def evaluate_model(name, model, X_test, y_test):
@@ -91,7 +184,7 @@ def evaluate_model(name, model, X_test, y_test):
     print("\nConfusion Matrix:\n", cm)
     print("\nClassification Report:\n", classification_report(y_test, preds, zero_division=0))
 
-    # AUC / ROC
+    # Predict probabilities for AUC
     if hasattr(model, "predict_proba"):
         probs = model.predict_proba(X_test)[:, 1]
     else:
@@ -101,6 +194,7 @@ def evaluate_model(name, model, X_test, y_test):
     print("AUC Score:", auc)
 
     fpr, tpr, _ = roc_curve(y_test, probs)
+
     return {
         "name": name,
         "accuracy": accuracy,
@@ -110,72 +204,79 @@ def evaluate_model(name, model, X_test, y_test):
         "auc": auc,
         "fpr": fpr,
         "tpr": tpr,
-        "model": model,
+        "model": model
     }
 
 
 # ============================================================
-# 5. Save best model via pickle
+# 7. SAVE BEST MODEL
 # ============================================================
 
-def save_model(model, filename="final_model.pkl"):
-    with open(filename, "wb") as f:
+def save_model(model):
+    with open(MODEL_PATH, "wb") as f:
         pickle.dump(model, f)
-    print(f"\nModel saved → {filename}")
+    print(f"Model saved → {MODEL_PATH}")
 
 
 # ============================================================
-# 6. Plot combined ROC curve
+# 8. PLOT ROC
 # ============================================================
 
 def plot_roc(results):
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(8, 6))
 
     for r in results:
         plt.plot(r["fpr"], r["tpr"], label=f"{r['name']} (AUC={r['auc']:.2f})")
 
-    plt.plot([0,1],[0,1], "k--")
+    plt.plot([0, 1], [0, 1], "k--")
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
     plt.title("ROC Curve Comparison")
-    plt.legend()
     plt.grid(True)
+    plt.legend()
+
     plt.tight_layout()
-    plt.savefig("roc_curve.png")
-    print("\nROC curve saved → roc_curve.png")
+    plt.savefig(ROC_PATH)
+    print("ROC curve saved →", ROC_PATH)
     plt.show()
 
 
 # ============================================================
-# MAIN PIPELINE
+# MAIN
 # ============================================================
 
 def main():
-    df = load_dataset("data/processed/clean_bike_data.csv")
 
-    X_train, X_test, y_train, y_test = split_data(df)
+    print("\n=== LOADING RAW DATA ===")
+    df_raw = load_raw_data(RAW_PATH)
+    
+    print("\n=== CLEANING DATA ===")
+    df_clean = clean_bike_data(df_raw)
+    save_cleaned_dataset(df_clean)
+    
+    COLUMNS_PATH = BASE_DIR / "models/model_columns.pkl"
+    with open(COLUMNS_PATH, "wb") as f:
+        pickle.dump(df_clean.drop(columns=["returned"]).columns.tolist(), f)
+    
+    print("\n=== SPLITTING DATA ===")
+    X_train, X_test, y_train, y_test = split_data(df_clean)
 
-    # Train both models
+    print("\n=== TRAINING MODELS ===")
     log_model = train_logistic_regression(X_train, y_train)
     tree_model = train_decision_tree(X_train, y_train)
 
-    # Evaluate
-    results = []
-    results.append(evaluate_model("Logistic Regression", log_model, X_test, y_test))
-    results.append(evaluate_model("Decision Tree", tree_model, X_test, y_test))
+    print("\n=== EVALUATING MODELS ===")
+    results = [
+        evaluate_model("Logistic Regression", log_model, X_test, y_test),
+        evaluate_model("Decision Tree", tree_model, X_test, y_test)
+    ]
 
-    # Choose best model based on AUC
     best_model = max(results, key=lambda r: r["auc"])
 
-    print("\n\n==============================")
-    print(" BEST MODEL SELECTED")
-    print("==============================")
-    print(f"{best_model['name']} with AUC={best_model['auc']:.3f}")
+    print("\n=== BEST MODEL SELECTED ===")
+    print(f"{best_model['name']} (AUC = {best_model['auc']:.3f})")
 
-    # Save model for Flask API
-    save_model(best_model["model"], "final_model.pkl")
-
-    # Save ROC comparison
+    save_model(best_model["model"])
     plot_roc(results)
 
 

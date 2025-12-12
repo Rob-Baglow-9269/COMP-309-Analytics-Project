@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bike Safe</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="../static/styles.css">
+</head>
+<body>
+    <div id="main-body">
+        <h1>Bike Safe - Theft Risk Predictor</h1>
+        <form action="@{/predict}" method="post" id="data-form">
+            <fieldset>
+                <legend>When was your bike stolen?</legend>
+                <div class="half-column">
+                    <label for="occ_date">Date:</label>
+                    <input type="date" id="occ_date" name="occ_date" required>
+                </div>
+                <div class="half-column">
+                    <label for="occ_time">Time:</label>
+                    <input type="time" id="occ_time" name="occ_time" required>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>When did you report your bike as stolen?</legend>
+                <div class="half-column">
+                    <label for="report_date">Date:</label>
+                    <input type="date" id="report_date" name="report_date" required>
+                </div>
+                <div class="half-column">
+                    <label for="report_time">Time:</label>
+                    <input type="time" id="report_time" name="report_time" required>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Where was your bike taken from?</legend>
+                <div class="half-column">
+                    <label for="location">Neighbourhood:</label>
+                    <select id="hood_158" name="hood_158" required>
+                        <option value="" disabled selected>Select your neighbourhood</option>
+                        {% for hood in hoods %}
+                            <option value="{{ hood.id }}">{{ hood.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="half-column">
+                    <label for="premises_type">Location Type:</label>
+                    <select id="premises_type" name="premises_type" required>
+                        <option value="" disabled selected>Select location type</option>
+                        {% for premises in premises_types %}
+                            <option value="{{ premises }}">{{ premises }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Additional Details</legend>
+                <div class="half-column">
+                    <label for="value">Estimated Value ($):</label>
+                    <input type="number" id="value" name="value" min="0" required>
+                </div>
+                <div class="half-column">
+                    <label for="bike_type">Bike Type:</label>
+                    <select id="bike_type" name="bike_type" required>
+                        <option value="" disabled selected>Select bike type</option>
+                        {% for bike in bike_types %}
+                            <option value="{{ bike }}">{{ bike }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="half-column">
+                    <label for="bike_speed">Bike Speed:</label>
+                    <input type="number" id="bike_speed" name="bike_speed" min="0" required>
+                </div>
+            </fieldset>
+            <div class="submit-button">
+                <button type="submit">Submit</button>
+            </div>
+            <script>
+                document.getElementById('data-form').addEventListener('submit', function (event) {
+                    event.preventDefault(); // Prevent the default form submission
+
+                    const formData = new FormData(this);
+                    const jsonObject = Object.fromEntries(formData.entries());
+                    const jsonString = JSON.stringify(jsonObject);
+
+                    fetch('/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: jsonString,
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Success:', data);
+                        // Handle success (e.g., redirect)
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                        // Handle errors
+                    });
+                });
+            </script>
+        </form>
+    </div>
+</body>
+</html>

@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import pickle
 import pandas as pd
 from pathlib import Path
+import opts
 
 app = Flask(__name__)
 
@@ -12,6 +13,7 @@ app = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"
+TEMPLATES_DIR = BASE_DIR / "templates"
 
 MODEL_PATH = MODELS_DIR / "final_model.pkl"
 COLS_PATH = MODELS_DIR / "model_columns.pkl"
@@ -92,6 +94,13 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+@app.route("/")
+def index():
+    from flask import render_template
+    return render_template("index.html",
+                           premises_types=opts.premises_types,
+                           bike_types=opts.bike_types,
+                           hoods=opts.hoods)
 
 # ===============================
 # Run server

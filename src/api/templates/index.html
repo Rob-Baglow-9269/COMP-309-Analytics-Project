@@ -10,7 +10,7 @@
 <body>
     <div id="main-body">
         <h1>Bike Safe - Theft Risk Predictor</h1>
-        <form action="@{/predict}" method="post" id="data-form">
+        <form action="/result" method="post" id="data-form">
             <fieldset>
                 <legend>When was your bike stolen?</legend>
                 <div class="half-column">
@@ -74,35 +74,9 @@
                     <input type="number" id="bike_speed" name="bike_speed" min="0" required>
                 </div>
             </fieldset>
-            <div class="submit-button">
+            <div class="solo-submit-button">
                 <button type="submit">Submit</button>
             </div>
-            <script>
-                document.getElementById('data-form').addEventListener('submit', function (event) {
-                    event.preventDefault(); // Prevent the default form submission
-
-                    const formData = new FormData(this);
-                    const jsonObject = Object.fromEntries(formData.entries());
-                    const jsonString = JSON.stringify(jsonObject);
-
-                    fetch('/predict', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: jsonString,
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Success:', data);
-                        // Handle success (e.g., redirect)
-                    })
-                    .catch((error) => {
-                        console.error('Error:', error);
-                        // Handle errors
-                    });
-                });
-            </script>
         </form>
     </div>
 </body>
